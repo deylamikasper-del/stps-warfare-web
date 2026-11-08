@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="da">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    <title>STPS Warfare</title>
+    <style>
+      /* The game fills the whole window: no page margin, footer or scrollbars to click on by accident. */
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0b0f17; }
+      body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; font-family: "Segoe UI", Arial, sans-serif; }
+      #unity-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; background: #0b0f17; }
+      #stps-loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; gap: 14px; }
+      #stps-loading .title { font-size: 34px; font-weight: 700; letter-spacing: 1px; }
+      #stps-loading .bar { width: 280px; height: 10px; border: 2px solid #f2c14e; border-radius: 6px; overflow: hidden; }
+      #stps-loading .fill { width: 0%; height: 100%; background: #f2c14e; }
+      /* Shown when the game wants the mouse but the browser released it (Esc, Alt+Tab, click outside). */
+      #stps-resume { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+                     background: rgba(5, 8, 14, 0.62); color: #fff; cursor: pointer; text-align: center; }
+      #stps-resume .big { font-size: 30px; font-weight: 700; padding: 14px 28px; border: 2px solid #f2c14e; border-radius: 8px; background: rgba(20, 26, 38, 0.9); }
+      #stps-resume .small { font-size: 15px; opacity: 0.85; }
+      #stps-fullscreen { font-size: 15px; color: #fff; background: rgba(20, 26, 38, 0.9); border: 1px solid #8a94a8; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+      #stps-warning { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); display: none; background: #b33; color: #fff; padding: 8px 14px; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="stps-loading"><div class="title">STPS Warfare</div><div class="bar"><div class="fill" id="stps-progress"></div></div></div>
+    <div id="stps-resume">
+      <div class="big">Klik for at fortsætte</div>
+      <div class="small">Musen er sluppet. Tryk Esc igen for pausemenuen.</div>
+      <button id="stps-fullscreen" type="button">Fuld skærm (anbefalet)</button>
+    </div>
+    <div id="stps-warning"></div>
+    <script>
+      // Raw mouse input for aiming: every pointer lock (also Unity's own) asks the browser for unadjusted movement, so
+      // Windows pointer acceleration ("Enhance pointer precision") and the OS pointer speed do not bend the aim.
+      // Browsers without support reject the option; then the lock is taken the normal way.
+      (function () {
+        var original = Element.prototype.requestPointerLock;
+        if (!original) return;
+        Element.prototype.requestPointerLock = function (options) {
+          var element = this;
+          var raw = Object.assign({}, options || {}, { unadjustedMovement: true });
+          try {
+            var result = original.call(element, raw);
+            if (result && result.catch) return result.catch(function () { return original.call(element, options); });
+            return result;
+          } catch (err) {
+            return original.call(element, options);
+          }
+        };
+      })();
+    </script>
+    <script src="Build/WebV7bRelease.loader.js"></script>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      var resume = document.querySelector("#stps-resume");
+      var unity = null;
+
+      // Set by the game (StpsBrowser.jslib): it wants the mouse locked / a match is running.
+      window.stpsWantsLock = false;
+      window.stpsInMatch = false;
+
+      window.stpsUpdateResume = function () {
+        var locked = document.pointerLockElement === canvas;
+        resume.style.display = unity && window.stpsWantsLock && !locked ? "flex" : "none";
+      };
+      document.addEventListener("pointerlockchange", window.stpsUpdateResume);
+      window.addEventListener("blur", window.stpsUpdateResume);
+
+      // The click on the overlay only takes the mouse back; it never reaches the game as a shot.
+      resume.addEventListener("mousedown", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (e.target && e.target.id === "stps-fullscreen") return;
+        canvas.focus();
+        try { var p = canvas.requestPointerLock(); if (p && p.catch) p.catch(function () {}); } catch (err) {}
+        if (unity) unity.SendMessage("STPS Browser Focus", "OnBrowserResume");
+      });
+      document.querySelector("#stps-fullscreen").addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (unity) unity.SetFullscreen(1);
+        canvas.focus();
+      });
+
+      // Keep keyboard input in the game: any click on the page focuses the canvas; no right-click menu.
+      document.addEventListener("mousedown", function () { canvas.focus(); });
+      document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+      // Leaving the page by accident (Ctrl+W, back, reload) during a match asks first.
+      window.addEventListener("beforeunload", function (e) {
+        if (!window.stpsInMatch) return;
+        e.preventDefault();
+        e.returnValue = "";
+      });
+
+      createUnityInstance(canvas, {
+        arguments: [],
+        dataUrl: "Build/WebV7bRelease.data.unityweb",
+        frameworkUrl: "Build/WebV7bRelease.framework.js.unityweb",
+        codeUrl: "Build/WebV7bRelease.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "STPS Warfare",
+        productVersion: "0.1.0",
+        showBanner: function (msg, type) {
+          if (type !== "error" && type !== "warning") return;
+          var w = document.querySelector("#stps-warning");
+          w.textContent = msg; w.style.display = "block";
+          if (type !== "error") setTimeout(function () { w.style.display = "none"; }, 5000);
+        },
+      }, function (progress) {
+        document.querySelector("#stps-progress").style.width = (100 * progress) + "%";
+      }).then(function (instance) {
+        unity = instance;
+        document.querySelector("#stps-loading").style.display = "none";
+        canvas.focus();
+        window.stpsUpdateResume();
+      }).catch(function (message) {
+        alert(message);
+      });
+    </script>
+  </body>
+</html>
