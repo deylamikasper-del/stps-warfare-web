@@ -19,7 +19,8 @@
                      background: rgba(5, 8, 14, 0.62); color: #fff; cursor: pointer; text-align: center; }
       #stps-resume .big { font-size: 30px; font-weight: 700; padding: 14px 28px; border: 2px solid #f2c14e; border-radius: 8px; background: rgba(20, 26, 38, 0.9); }
       #stps-resume .small { font-size: 15px; opacity: 0.85; }
-      #stps-fullscreen { font-size: 15px; color: #fff; background: rgba(20, 26, 38, 0.9); border: 1px solid #8a94a8; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+      #stps-fullscreen, #stps-unlocked { font-size: 15px; color: #fff; background: rgba(20, 26, 38, 0.9); border: 1px solid #8a94a8; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+      #stps-unlocked { display: none; }
       #stps-warning { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); display: none; background: #b33; color: #fff; padding: 8px 14px; border-radius: 6px; }
     </style>
   </head>
@@ -30,29 +31,41 @@
       <div class="big">Klik for at fortsætte</div>
       <div class="small">Musen er sluppet. Tryk Esc igen for pausemenuen.</div>
       <button id="stps-fullscreen" type="button">Fuld skærm (anbefalet)</button>
+      <button id="stps-unlocked" type="button">Fortsæt uden muselås</button>
     </div>
     <div id="stps-warning"></div>
     <script>
       // Raw mouse input for aiming: every pointer lock (also Unity's own) asks the browser for unadjusted movement, so
       // Windows pointer acceleration ("Enhance pointer precision") and the OS pointer speed do not bend the aim.
-      // Browsers without support reject the option; then the lock is taken the normal way.
+      // Only an unsupported raw-input option is retried normally. A denied or unavailable lock must not abort Unity.
       (function () {
         var original = Element.prototype.requestPointerLock;
         if (!original) return;
+        function failed(error) {
+          if (window.stpsPointerLockFailed) window.stpsPointerLockFailed(error);
+        }
+        function normal(element, options) {
+          try {
+            var result = original.call(element, options);
+            return result && result.catch ? result.catch(failed) : result;
+          } catch (error) { failed(error); }
+        }
         Element.prototype.requestPointerLock = function (options) {
           var element = this;
           var raw = Object.assign({}, options || {}, { unadjustedMovement: true });
+          function fallback(error) {
+            if (error && error.name === "NotSupportedError") return normal(element, options);
+            return failed(error);
+          }
           try {
             var result = original.call(element, raw);
-            if (result && result.catch) return result.catch(function () { return original.call(element, options); });
+            if (result && result.catch) return result.catch(fallback);
             return result;
-          } catch (err) {
-            return original.call(element, options);
-          }
+          } catch (error) { return fallback(error); }
         };
       })();
     </script>
-    <script src="Build/WebV8AccessRelease.loader.js"></script>
+    <script src="Build/WebV9Release.loader.js"></script>
     <script>
       var canvas = document.querySelector("#unity-canvas");
       var resume = document.querySelector("#stps-resume");
@@ -61,10 +74,17 @@
       // Set by the game (StpsBrowser.jslib): it wants the mouse locked / a match is running.
       window.stpsWantsLock = false;
       window.stpsInMatch = false;
+      window.stpsUnlockedInput = false;
 
       window.stpsUpdateResume = function () {
         var locked = document.pointerLockElement === canvas;
-        resume.style.display = unity && window.stpsWantsLock && !locked ? "flex" : "none";
+        if (locked) window.stpsUnlockedInput = false;
+        resume.style.display = unity && window.stpsWantsLock && !locked && !window.stpsUnlockedInput ? "flex" : "none";
+      };
+      window.stpsPointerLockFailed = function () {
+        document.querySelector("#stps-unlocked").style.display = "block";
+        document.querySelector("#stps-resume .small").textContent = "Browseren kunne ikke låse musen. Prøv igen, eller fortsæt uden muselås.";
+        window.stpsUpdateResume();
       };
       document.addEventListener("pointerlockchange", window.stpsUpdateResume);
       window.addEventListener("blur", window.stpsUpdateResume);
@@ -72,7 +92,7 @@
       // The click on the overlay only takes the mouse back; it never reaches the game as a shot.
       resume.addEventListener("mousedown", function (e) {
         e.preventDefault(); e.stopPropagation();
-        if (e.target && e.target.id === "stps-fullscreen") return;
+        if (e.target && (e.target.id === "stps-fullscreen" || e.target.id === "stps-unlocked")) return;
         canvas.focus();
         try { var p = canvas.requestPointerLock(); if (p && p.catch) p.catch(function () {}); } catch (err) {}
         if (unity) unity.SendMessage("STPS Browser Focus", "OnBrowserResume");
@@ -81,6 +101,13 @@
         e.stopPropagation();
         if (unity) unity.SetFullscreen(1);
         canvas.focus();
+      });
+      document.querySelector("#stps-unlocked").addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        window.stpsUnlockedInput = true;
+        window.stpsUpdateResume();
+        canvas.focus();
+        if (unity) unity.SendMessage("STPS Browser Focus", "OnBrowserResume");
       });
 
       // Keep keyboard input in the game: any click on the page focuses the canvas; no right-click menu.
@@ -96,9 +123,9 @@
 
       createUnityInstance(canvas, {
         arguments: [],
-        dataUrl: "Build/WebV8AccessRelease.data.unityweb",
-        frameworkUrl: "Build/WebV8AccessRelease.framework.js.unityweb",
-        codeUrl: "Build/WebV8AccessRelease.wasm.unityweb",
+        dataUrl: "Build/WebV9Release.data.unityweb",
+        frameworkUrl: "Build/WebV9Release.framework.js.unityweb",
+        codeUrl: "Build/WebV9Release.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "STPS Warfare",
