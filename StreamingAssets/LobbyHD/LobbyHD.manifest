@@ -1,0 +1,60 @@
+ManifestFileVersion: 0
+UnityVersion: 6000.6.2f1
+CRC: 3129986597
+HashAppended: 1
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: lobby_amal_82d3284141f986cd590c75f81f134dcf
+      Dependencies: {}
+    Info_1:
+      Name: lobby_ande_635b88f6ffaac94a0f1599c23bc6ab60
+      Dependencies: {}
+    Info_2:
+      Name: lobby_ane_578d24213b675f53b8b5eee5587b58fc
+      Dependencies: {}
+    Info_3:
+      Name: lobby_birg_4b166bdcbc12ff5d86d1275ac2eaf7ce
+      Dependencies: {}
+    Info_4:
+      Name: lobby_cami_d409f44c5d9cc7e4f793b78070f46da4
+      Dependencies: {}
+    Info_5:
+      Name: lobby_clau_f169273b33c3d96ad793b328ac57b457
+      Dependencies: {}
+    Info_6:
+      Name: lobby_greg_6d308a4ba64db50b16838ee58c3128db
+      Dependencies: {}
+    Info_7:
+      Name: lobby_henr_d3ad7b80c9bbaf18a79d46b60004f5ef
+      Dependencies: {}
+    Info_8:
+      Name: lobby_janu_25a5f880e8b9e0e9c9951ceb82874d69
+      Dependencies: {}
+    Info_9:
+      Name: lobby_jens_46a3924ad90845790235a41002155887
+      Dependencies: {}
+    Info_10:
+      Name: lobby_kasd_d3cac3884bba336961c09628af62273f
+      Dependencies: {}
+    Info_11:
+      Name: lobby_lass_62cc17a4deec6e1a151b18620b0f3e96
+      Dependencies: {}
+    Info_12:
+      Name: lobby_line_e0cac4acdf97973a9de2740f16b9b43e
+      Dependencies: {}
+    Info_13:
+      Name: lobby_math_9cc8865c18396aea24180453b5acb53d
+      Dependencies: {}
+    Info_14:
+      Name: lobby_niel_ff27c4e3215dae430511d8a774529d33
+      Dependencies: {}
+    Info_15:
+      Name: lobby_rikk_f1627983e31b6bc27ba265813df03ec9
+      Dependencies: {}
+    Info_16:
+      Name: lobby_suha_66b898b8cb7d447884fa9bd470d22977
+      Dependencies: {}
+    Info_17:
+      Name: lobby_tliv_89894416e49114719fdc8c937d1a7a18
+      Dependencies: {}
